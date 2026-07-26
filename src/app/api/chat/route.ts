@@ -45,6 +45,17 @@ RULES:
 - If a memory has a photo, append [SHOW_IMAGE: Memory ID] at the end.
 - Only use memory IDs listed above.`;
 
+    const initPrompts: Record<string, string> = {
+      "HINDI (using Devanagari script)": "(कृपया मुझे अभिवादन करें और हमारी बातचीत शुरू करें। यह मत कहो कि मैंने तुम्हें ऐसा करने के लिए कहा है।)",
+      "ENGLISH": "(Please greet me and start our conversation. Do not mention that I asked you to do this.)",
+      "GUJARATI (using Gujarati script)": "(કૃપા કરીને મારું અભિવાદન કરો અને અમારી વાતચીત શરૂ કરો. એવું ન કહો કે મેં તમને આમ કરવાનું કહ્યું છે.)",
+      "MARATHI (using Devanagari script)": "(कृपया मला अभिवादन करा आणि आमचे संभाषण सुरू करा. मी तुम्हाला असे करण्यास सांगितले आहे असे म्हणू नका.)",
+      "TAMIL (using Tamil script)": "(தயவுசெய்து என்னை வாழ்த்தி எங்கள் உரையாடலைத் தொடங்குங்கள். நான் இதைச் செய்யச் சொன்னேன் என்று சொல்ல வேண்டாம்.)",
+      "BENGALI (using Bengali script)": "(দয়া করে আমাকে অভিবাদন জানান এবং আমাদের কথোপকথন শুরু করুন। বলবেন না যে আমি আপনাকে এটি করতে বলেছি।)"
+    };
+    
+    const translatedInit = initPrompts[targetLanguage] || initPrompts["HINDI (using Devanagari script)"];
+
     // If we have a Sarvam API key, call their endpoint
     if (SARVAM_API_KEY) {
       try {
@@ -59,8 +70,8 @@ RULES:
             messages: [
               { role: "system", content: systemPrompt },
               ...(history && history.length > 0 
-                ? history.map((h: any) => ({ role: h.role, content: h.content })) 
-                : [{ role: "user", content: message }])
+                ? history.map((h: any) => ({ role: h.role, content: h.content === "[INIT_CONVERSATION]" ? translatedInit : h.content })) 
+                : [{ role: "user", content: message === "[INIT_CONVERSATION]" ? translatedInit : message }])
             ],
             temperature: 0.5,
             max_tokens: 4000,

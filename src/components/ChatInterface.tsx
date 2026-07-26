@@ -137,6 +137,15 @@ export default function ChatInterface() {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
+      
+      // Auto-extract memories silently in the background
+      if (messages.length > 2) {
+        fetch("/api/memory/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ history: messages })
+        }).catch(err => console.error("Memory extraction error:", err));
+      }
     }
   };
 
@@ -198,12 +207,13 @@ export default function ChatInterface() {
   
   handleSendRef.current = async (userMessage: string) => {
     const isInit = userMessage === "[INIT_CONVERSATION]";
-    const apiMessage = isInit ? "Greet me warmly and ask me how I am doing or bring up a memory to start the conversation. Do not mention that I asked you to do this." : userMessage;
     
-    // Only store actual user messages in the history
-    const chatHistory = isInit ? [...messages] : [...messages, { role: "user" as const, content: userMessage }];
+    // The frontend shouldn't show INIT_CONVERSATION, but we must send it to the backend as the latest message
+    const frontendHistory = isInit ? [...messages] : [...messages, { role: "user" as const, content: userMessage }];
+    const apiHistory = [...messages, { role: "user" as const, content: userMessage }];
+    
     if (!isInit) {
-      setMessages(chatHistory);
+      setMessages(frontendHistory);
       setCurrentSubtitle(userMessage); // Show the user's message immediately while thinking
     } else {
       setCurrentSubtitle("Connecting...");
@@ -214,7 +224,7 @@ export default function ChatInterface() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: apiMessage, history: chatHistory })
+        body: JSON.stringify({ message: userMessage, history: apiHistory })
       });
       
       const data = await response.json();
