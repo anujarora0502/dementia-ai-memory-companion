@@ -119,13 +119,15 @@ export default function ChatInterface() {
 
   const toggleConversation = () => {
     if (!isConversationActive) {
-      // Start the conversation loop
+      // Start the conversation loop by having the agent lead
       setIsConversationActive(true);
-      setOrbState("listening");
+      setOrbState("thinking");
       setLiveTranscript("");
-      try {
-        recognitionRef.current?.start();
-      } catch (e) {}
+      
+      // Trigger the AI to greet first
+      if (handleSendRef.current) {
+        handleSendRef.current("[INIT_CONVERSATION]");
+      }
     } else {
       // Stop the conversation completely
       setIsConversationActive(false);
@@ -195,18 +197,24 @@ export default function ChatInterface() {
   const handleSendRef = useRef<((msg: string) => void) | null>(null);
   
   handleSendRef.current = async (userMessage: string) => {
-    const newMessage = { role: "user" as const, content: userMessage };
-    const chatHistory = [...messages, newMessage];
+    const isInit = userMessage === "[INIT_CONVERSATION]";
+    const apiMessage = isInit ? "Greet me warmly and ask me how I am doing or bring up a memory to start the conversation. Do not mention that I asked you to do this." : userMessage;
     
-    setMessages(chatHistory);
-    setCurrentSubtitle(userMessage); // Show the user's message immediately while thinking
+    // Only store actual user messages in the history
+    const chatHistory = isInit ? [...messages] : [...messages, { role: "user" as const, content: userMessage }];
+    if (!isInit) {
+      setMessages(chatHistory);
+      setCurrentSubtitle(userMessage); // Show the user's message immediately while thinking
+    } else {
+      setCurrentSubtitle("Connecting...");
+    }
     setCurrentImage(null);
     
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage, history: chatHistory })
+        body: JSON.stringify({ message: apiMessage, history: chatHistory })
       });
       
       const data = await response.json();
