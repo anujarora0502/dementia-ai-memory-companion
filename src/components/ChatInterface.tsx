@@ -149,8 +149,17 @@ export default function ChatInterface() {
     }
   };
 
+  const stopRecognition = () => {
+    try {
+      recognitionRef.current?.stop();
+    } catch (error) {
+      // Ignore stop failures; stop is best-effort.
+    }
+  };
+
   const playTTS = async (textToSpeak: string, imageUrl?: string, imageTitle?: string) => {
     try {
+      stopRecognition();
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -221,6 +230,7 @@ export default function ChatInterface() {
     setCurrentImage(null);
     
     try {
+      stopRecognition();
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
