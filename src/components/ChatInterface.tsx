@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, Settings } from "lucide-react";
+import { Mic, MicOff, Settings, Square } from "lucide-react";
+import CalmParticles from "./CalmParticles";
 import "./chat.css";
 
 interface Message {
@@ -17,16 +18,21 @@ export default function ChatInterface() {
   ]);
   const [orbState, setOrbState] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
   const [liveTranscript, setLiveTranscript] = useState("");
+  const [isConversationActive, setIsConversationActive] = useState(false);
   
   const recognitionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
-  // Use a ref to store the latest transcript so we don't have stale closures in the onend callback
   const transcriptRef = useRef("");
+  const isConversationActiveRef = useRef(false);
 
   useEffect(() => {
     transcriptRef.current = liveTranscript;
   }, [liveTranscript]);
+
+  useEffect(() => {
+    isConversationActiveRef.current = isConversationActive;
+  }, [isConversationActive]);
 
   // Initialize Speech Recognition once
   useEffect(() => {
@@ -35,7 +41,7 @@ export default function ChatInterface() {
     if (SpeechRecognition && !recognitionRef.current) {
       const recognition = new SpeechRecognition();
       recognition.lang = "hi-IN";
-      recognition.continuous = false; // Stop automatically when user pauses
+      recognition.continuous = false; // We manage the continuous loop manually for better control
       recognition.interimResults = true;
 
       recognition.onresult = (event: any) => {
@@ -54,56 +60,65 @@ export default function ChatInterface() {
       };
 
       recognition.onend = () => {
-        // When speech recognition ends (either manually or by timeout)
         const finalString = transcriptRef.current.trim();
         
         if (finalString) {
-          // We have a transcript, send it!
+          // Send transcript to AI
           setOrbState("thinking");
           handleSend(finalString);
           setLiveTranscript("");
         } else {
-          // No transcript, go back to idle
-          setOrbState("idle");
+          // If no transcript was captured and the conversation is still active, just restart listening
+          if (isConversationActiveRef.current && orbState !== "thinking" && orbState !== "speaking") {
+            try {
+              recognitionRef.current?.start();
+            } catch(e) {}
+          } else if (!isConversationActiveRef.current) {
+            setOrbState("idle");
+          }
         }
       };
 
       recognition.onerror = (e: any) => {
         console.error("Speech recognition error", e.error);
-        setOrbState("idle");
+        if (e.error === 'no-speech' && isConversationActiveRef.current) {
+          // Just ignore no-speech and let it restart via onend
+        } else {
+          setIsConversationActive(false);
+          setOrbState("idle");
+        }
         setLiveTranscript("");
       };
 
       recognitionRef.current = recognition;
     }
     
-    // Cleanup if component unmounts
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+      if (recognitionRef.current) recognitionRef.current.stop();
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
     };
-  }, []); // Empty dependency array, run once!
+  }, []); // Run once
 
-  const toggleListening = () => {
-    if (orbState === "idle" || orbState === "speaking") {
-      // Stop speaking if currently speaking
+  const toggleConversation = () => {
+    if (!isConversationActive) {
+      // Start the conversation loop
+      setIsConversationActive(true);
+      setOrbState("listening");
+      setLiveTranscript("");
+      try {
+        recognitionRef.current?.start();
+      } catch (e) {}
+    } else {
+      // Stop the conversation completely
+      setIsConversationActive(false);
+      setOrbState("idle");
+      recognitionRef.current?.stop();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
-      
-      setOrbState("listening");
-      setLiveTranscript("");
-      
-      try {
-        recognitionRef.current?.start();
-      } catch (e) {
-        console.error("Already started", e);
-      }
-    } else if (orbState === "listening") {
-      // Manually stopping it
-      recognitionRef.current?.stop();
     }
   };
 
@@ -122,24 +137,37 @@ export default function ChatInterface() {
         audioRef.current = audio;
         
         audio.onended = () => {
-          setOrbState("idle");
+          if (isConversationActiveRef.current) {
+            // Resume listening automatically after AI finishes speaking
+            setOrbState("listening");
+            try {
+              recognitionRef.current?.start();
+            } catch (e) {}
+          } else {
+            setOrbState("idle");
+          }
         };
         
         setOrbState("speaking");
         audio.play();
       } else {
-        setOrbState("idle");
+        if (isConversationActiveRef.current) {
+           setOrbState("listening");
+           recognitionRef.current?.start();
+        } else {
+           setOrbState("idle");
+        }
       }
     } catch (e) {
       console.error("TTS failed", e);
-      setOrbState("idle");
+      if (isConversationActiveRef.current) {
+        setOrbState("listening");
+        recognitionRef.current?.start();
+      } else {
+        setOrbState("idle");
+      }
     }
   };
-
-  // We need handleSend defined before useEffect if it was used in useEffect, 
-  // but it's used inside the closure of onend, which is fine as long as we use a ref or closure captures it.
-  // Actually, handleSend being re-created every render might be an issue inside the onend closure from the initial render!
-  // Let's use a ref for handleSend to avoid stale closures in the initial useEffect!
 
   const handleSendRef = useRef<((msg: string) => void) | null>(null);
   
@@ -161,11 +189,9 @@ export default function ChatInterface() {
         let imageTitle: string | undefined;
         
         const imageMatch = replyContent.match(/\[SHOW_IMAGE:\s*([a-zA-Z0-9_-]+)\]/);
-        
         if (imageMatch) {
           const memoryId = imageMatch[1];
           replyContent = replyContent.replace(imageMatch[0], "").trim();
-          
           try {
             const memoryRes = await fetch(`/api/memories/${memoryId}`);
             if (memoryRes.ok) {
@@ -175,9 +201,7 @@ export default function ChatInterface() {
                 imageTitle = memoryData.title;
               }
             }
-          } catch (err) {
-            console.error("Failed to load memory image", err);
-          }
+          } catch (err) {}
         }
         
         setMessages(prev => [...prev, { 
@@ -188,27 +212,37 @@ export default function ChatInterface() {
         }]);
 
         // Speak the clean text
-        await playTTS(replyContent);
+        if (isConversationActiveRef.current) {
+          await playTTS(replyContent);
+        }
       } else {
-        setOrbState("idle");
+        if (isConversationActiveRef.current) {
+          setOrbState("listening");
+          recognitionRef.current?.start();
+        }
       }
     } catch (error) {
       console.error("Chat error:", error);
-      setOrbState("idle");
+      if (isConversationActiveRef.current) {
+        setOrbState("listening");
+        recognitionRef.current?.start();
+      }
     }
   };
 
   const handleSend = (msg: string) => {
-    if (handleSendRef.current) {
-      handleSendRef.current(msg);
-    }
+    if (handleSendRef.current) handleSendRef.current(msg);
   };
 
   const latestMessage = messages[messages.length - 1];
 
   return (
-    <div className="chat-container">
-      <header className="chat-header">
+    <div className="chat-container" style={{ position: 'relative', overflow: 'hidden' }}>
+      
+      {/* 3D Calm Particle Background */}
+      <CalmParticles isSpeaking={orbState === "speaking"} />
+
+      <header className="chat-header" style={{ position: 'relative', zIndex: 10 }}>
         <a href="/caregiver" className="icon-btn" style={{color: 'var(--text-secondary)'}}>
           <Settings size={24} />
         </a>
@@ -218,7 +252,7 @@ export default function ChatInterface() {
         <div style={{width: 24}}></div>
       </header>
 
-      <div className="voice-interface-main">
+      <div className="voice-interface-main" style={{ position: 'relative', zIndex: 10 }}>
         <div className="transcript-area">
           {latestMessage && latestMessage.role === "assistant" && (
             <div className="message-bubble assistant animate-slide-up">
@@ -239,40 +273,34 @@ export default function ChatInterface() {
           )}
         </div>
 
-        <div className={`orb-container orb-state-${orbState}`}>
-          {orbState === "listening" && (
-            <>
-              <div className="orb-ripple"></div>
-              <div className="orb-ripple"></div>
-            </>
-          )}
-          {orbState === "speaking" && (
-            <>
-              <div className="orb-ripple"></div>
-              <div className="orb-ripple"></div>
-            </>
+        {/* Minimal Control Bar */}
+        <div className="subtle-controls flex-col items-center gap-2 mt-8">
+          {liveTranscript && (
+            <div className="live-transcript" style={{ marginBottom: '1rem', background: 'rgba(255,255,255,0.2)' }}>
+              {liveTranscript}
+            </div>
           )}
           
-          <div className="voice-orb" onClick={toggleListening}>
-            {orbState === "listening" ? (
-               <MicOff size={40} className="orb-icon" />
-            ) : (
-               <Mic size={40} className="orb-icon" />
-            )}
-          </div>
-          
-          <div className="orb-status-text">
-            {orbState === "idle" && "Tap to Speak"}
+          <div className="orb-status-text" style={{ marginBottom: '0.5rem', opacity: 0.8 }}>
+            {orbState === "idle" && "Tap to start conversation"}
             {orbState === "listening" && "Listening..."}
             {orbState === "thinking" && "Thinking..."}
             {orbState === "speaking" && "Speaking..."}
           </div>
-          
-          {liveTranscript && (
-            <div className="live-transcript">
-              {liveTranscript}
-            </div>
-          )}
+
+          <button 
+            onClick={toggleConversation}
+            className="glass-button"
+            style={{
+              padding: '1rem',
+              borderRadius: '50%',
+              background: isConversationActive ? 'rgba(230, 57, 70, 0.2)' : 'rgba(255,255,255,0.3)',
+              border: `1px solid ${isConversationActive ? 'rgba(230, 57, 70, 0.5)' : 'rgba(255,255,255,0.5)'}`,
+              color: isConversationActive ? '#E63946' : 'var(--text-primary)'
+            }}
+          >
+            {isConversationActive ? <Square size={24} fill="currentColor" /> : <Mic size={24} />}
+          </button>
         </div>
       </div>
     </div>
