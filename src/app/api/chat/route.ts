@@ -121,9 +121,12 @@ CRITICAL CARE RULES:
 
     // Mock response for development if no key is provided
     let mockReply = `नमस्ते ${profile.name}, मुझे आपकी आवाज़ सुनकर बहुत अच्छा लगा। `;
-    
-    // Simple keyword matching for mock
-    if (message.toLowerCase().includes("wedding") || message.toLowerCase().includes("शादी")) {
+    const isInitMessage = message === "[INIT_CONVERSATION]";
+    const preferredMemory = memories.find(m => m.imageUrl) || memories[0];
+
+    if (isInitMessage && preferredMemory) {
+      mockReply += `मुझे अभी आपकी एक प्यारी याद याद आई: ${preferredMemory.title}. ${preferredMemory.description} [SHOW_IMAGE: ${preferredMemory.id}]`;
+    } else if (message.toLowerCase().includes("wedding") || message.toLowerCase().includes("शादी")) {
       mockReply += "मुझे आपके सेंट्रल पार्क वाले शादी के दिन की याद आ रही थी। वो दिन कितना खूबसूरत था ना? [SHOW_IMAGE: 1]";
     } else if (message.toLowerCase().includes("hawaii") || message.toLowerCase().includes("छुट्टी")) {
       mockReply += "1995 में आपकी हवाई की छुट्टी की कहानियाँ मुझे बहुत पसंद हैं। क्या आपको वहाँ की वो ठंडी हवा याद है? [SHOW_IMAGE: 2]";

@@ -100,11 +100,13 @@
   font-weight: 500;
   color: #1a1a1a;
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.75;
   letter-spacing: -0.01em;
-  padding: 1.5rem;
+  padding: 1.75rem 1.5rem;
   background: transparent;
   max-width: 90%;
+  overflow-wrap: break-word;
+  word-break: break-word;
   animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   flex-shrink: 0;
 }
@@ -114,7 +116,7 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-  max-width: 80%;
+  max-width: 90%;
   border: 1px solid rgba(0, 0, 0, 0.06);
   animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   flex-shrink: 0;
@@ -123,10 +125,11 @@
 .cinematic-image img {
   width: 100%;
   height: auto;
-  max-height: 40vh;
+  max-height: 50vh;
   object-fit: contain;
   display: block;
 }
+
 
 .subtle-image-reveal {
   max-width: 80%;
