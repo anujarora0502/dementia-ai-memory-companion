@@ -227,7 +227,7 @@ export default function ChatInterface() {
               if (memoryData.imageUrl) {
                 imageUrl = memoryData.imageUrl;
                 imageTitle = memoryData.title;
-                setCurrentImage({ url: imageUrl, title: imageTitle });
+                setCurrentImage({ url: imageUrl as string, title: imageTitle || "" });
               }
             }
           } catch (err) {}
