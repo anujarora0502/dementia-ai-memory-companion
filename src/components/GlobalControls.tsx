@@ -43,40 +43,50 @@ export default function GlobalControls() {
     transition: 'all 0.2s ease-in-out',
     textDecoration: 'none'
   };
-
   return (
-    <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999, display: 'flex', gap: '12px' }}>
-      <Link 
-        href="/caregiver"
-        style={buttonStyle}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(40, 40, 40, 0.9)';
-          e.currentTarget.style.transform = 'scale(1.05)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(20, 20, 20, 0.8)';
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-        title="Settings & Dashboard"
-      >
-        <Settings size={20} />
-      </Link>
-      
-      <button
-        onClick={toggleFullscreen}
-        style={buttonStyle}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(40, 40, 40, 0.9)';
-          e.currentTarget.style.transform = 'scale(1.05)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(20, 20, 20, 0.8)';
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-        title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-      >
-        {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-      </button>
-    </div>
+    <>
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .global-controls-container {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
+      <div className="global-controls-container" style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999, display: 'flex', gap: '12px' }}>
+        <Link 
+          href="/caregiver"
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(40, 40, 40, 0.9)';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(20, 20, 20, 0.8)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          title="Settings & Dashboard"
+        >
+          <Settings size={20} />
+        </Link>
+        
+        <button
+          onClick={toggleFullscreen}
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(40, 40, 40, 0.9)';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(20, 20, 20, 0.8)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+        >
+          {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+        </button>
+      </div>
+    </>
   );
 }
