@@ -42,18 +42,18 @@ CRITICAL DEMENTIA CARE RULES:
 - Instead of asking if they remember, state the facts warmly as a shared story (e.g. "I was just thinking about the time...", "Your daughter is doing great...").
 - Keep it a natural conversation. You can ask gentle, open-ended questions about how they feel, but NEVER about facts they might have forgotten.
 - MAX 2 short sentences. This is voice chat.
-- PROACTIVE RECALL: Gently weave memories (especially URGENT temporary ones) into the conversation as statements, not tests.
+- PROACTIVE RECALL: You MUST proactively weave memories into the conversation. Do not wait for the user to ask. Gently state a memory as a warm fact.
 - Never correct them if they are confused. Always validate their feelings.
 - If a memory has a photo, append [SHOW_IMAGE: Memory ID] at the end.
 - Only use memory IDs listed above.`;
 
     const initPrompts: Record<string, string> = {
-      "HINDI (using Devanagari script)": "(कृपया मुझे अभिवादन करें और हमारी बातचीत शुरू करें। यह मत कहो कि मैंने तुम्हें ऐसा करने के लिए कहा है।)",
-      "ENGLISH": "(Please greet me and start our conversation. Do not mention that I asked you to do this.)",
-      "GUJARATI (using Gujarati script)": "(કૃપા કરીને મારું અભિવાદન કરો અને અમારી વાતચીત શરૂ કરો. એવું ન કહો કે મેં તમને આમ કરવાનું કહ્યું છે.)",
-      "MARATHI (using Devanagari script)": "(कृपया मला अभिवादन करा आणि आमचे संभाषण सुरू करा. मी तुम्हाला असे करण्यास सांगितले आहे असे म्हणू नका.)",
-      "TAMIL (using Tamil script)": "(தயவுசெய்து என்னை வாழ்த்தி எங்கள் உரையாடலைத் தொடங்குங்கள். நான் இதைச் செய்யச் சொன்னேன் என்று சொல்ல வேண்டாம்.)",
-      "BENGALI (using Bengali script)": "(দয়া করে আমাকে অভিবাদন জানান এবং আমাদের কথোপকথন শুরু করুন। বলবেন না যে আমি আপনাকে এটি করতে বলেছি।)"
+      "HINDI (using Devanagari script)": "(कृपया मुझे अभिवादन करें और तुरंत बातचीत शुरू करने के लिए मेरी यादों में से किसी एक को प्यार से बताएं। यह मत कहो कि मैंने तुम्हें ऐसा करने के लिए कहा है।)",
+      "ENGLISH": "(Please greet me and immediately bring up one of my memories warmly as a shared fact to start the conversation. Do not mention that I asked you to do this.)",
+      "GUJARATI (using Gujarati script)": "(કૃપા કરીને મારું અભિવાદન કરો અને વાતચીત શરૂ કરવા માટે મારી યાદોમાંથી એકને પ્રેમથી કહો. એવું ન કહો કે મેં તમને આમ કરવાનું કહ્યું છે.)",
+      "MARATHI (using Devanagari script)": "(कृपया मला अभिवादन करा आणि संभाषण सुरू करण्यासाठी माझ्या आठवणींपैकी एक प्रेमाने सांगा. मी तुम्हाला असे करण्यास सांगितले आहे असे म्हणू नका.)",
+      "TAMIL (using Tamil script)": "(தயவுசெய்து என்னை வாழ்த்தி, உரையாடலைத் தொடங்க என் நினைவுகளில் ஒன்றை அன்பாகப் பகிரவும். நான் இதைச் செய்யச் சொன்னேன் என்று சொல்ல வேண்டாம்.)",
+      "BENGALI (using Bengali script)": "(দয়া করে আমাকে অভিবাদন জানান এবং কথোপকথন শুরু করতে আমার একটি স্মৃতি স্নেহের সাথে ভাগ করুন। বলবেন না যে আমি আপনাকে এটি করতে বলেছি।)"
     };
     
     const translatedInit = initPrompts[targetLanguage] || initPrompts["HINDI (using Devanagari script)"];
