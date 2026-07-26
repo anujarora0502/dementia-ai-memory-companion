@@ -7,7 +7,7 @@ export async function GET(
 ) {
   const { id } = await params;
   try {
-    const memory = memoryStore.getMemoryById(id);
+    const memory = await memoryStore.getMemoryById(id);
     if (!memory) {
       return NextResponse.json({ error: "Memory not found" }, { status: 404 });
     }

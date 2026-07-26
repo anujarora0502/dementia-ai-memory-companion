@@ -14,8 +14,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
-    const profile = memoryStore.getProfile();
-    const memories = memoryStore.getMemories();
+    const profile = await memoryStore.getProfile();
+    const memories = await memoryStore.getMemories();
 
     // Construct the context string
     const memoriesContext = memories.map(m => 

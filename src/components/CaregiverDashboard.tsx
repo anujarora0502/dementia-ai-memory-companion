@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Plus, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Plus, Image as ImageIcon, Upload, Clock } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 import "./dashboard.css";
 
 interface Memory {
@@ -9,7 +10,8 @@ interface Memory {
   title: string;
   description: string;
   imageUrl?: string;
-  dateAdded: string;
+  created_at: string;
+  expires_at?: string;
 }
 
 export default function CaregiverDashboard() {
@@ -18,7 +20,9 @@ export default function CaregiverDashboard() {
   
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
-  const [newImageUrl, setNewImageUrl] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isTemporary, setIsTemporary] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const fetchMemories = async () => {
     try {
@@ -39,26 +43,63 @@ export default function CaregiverDashboard() {
   const handleAddMemory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newDescription) return;
+    setUploading(true);
 
     try {
+      let finalImageUrl = "";
+
+      // Handle Image Upload to Supabase Storage
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `caregiver-uploads/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('photos')
+          .upload(filePath, selectedFile);
+
+        if (uploadError) {
+          console.error("Upload failed", uploadError);
+          alert("Failed to upload image.");
+          setUploading(false);
+          return;
+        }
+
+        const { data } = supabase.storage.from('photos').getPublicUrl(filePath);
+        finalImageUrl = data.publicUrl;
+      }
+
+      // Calculate TTL (Expires tomorrow if temporary)
+      let expiresAt = null;
+      if (isTemporary) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        expiresAt = tomorrow.toISOString();
+      }
+
+      // Save memory to API
       const res = await fetch("/api/memories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: newTitle,
           description: newDescription,
-          imageUrl: newImageUrl
+          imageUrl: finalImageUrl,
+          expires_at: expiresAt
         })
       });
 
       if (res.ok) {
         setNewTitle("");
         setNewDescription("");
-        setNewImageUrl("");
+        setSelectedFile(null);
+        setIsTemporary(false);
         fetchMemories();
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -71,7 +112,7 @@ export default function CaregiverDashboard() {
           </a>
           <div>
             <h1>Caregiver Dashboard</h1>
-            <p className="subtitle">Manage memories and preferences for Eleanor.</p>
+            <p className="subtitle">Manage memories and preferences for Sheela.</p>
           </div>
         </div>
       </header>
@@ -108,22 +149,33 @@ export default function CaregiverDashboard() {
             </div>
 
             <div className="flex-col gap-2">
-              <label>Photograph URL (Optional)</label>
+              <label>Upload Photograph</label>
               <div className="flex-row gap-2 items-center">
-                <ImageIcon size={20} className="text-secondary" />
+                <Upload size={20} className="text-secondary" />
                 <input 
-                  type="url" 
+                  type="file" 
+                  accept="image/*"
                   className="glass-input w-full" 
-                  placeholder="https://..."
-                  value={newImageUrl}
-                  onChange={e => setNewImageUrl(e.target.value)}
+                  onChange={e => setSelectedFile(e.target.files?.[0] || null)}
                 />
               </div>
             </div>
 
-            <button type="submit" className="glass-button primary mt-4">
+            <div className="flex-row gap-2 items-center mt-2">
+              <input 
+                type="checkbox" 
+                id="ttl-check"
+                checked={isTemporary}
+                onChange={e => setIsTemporary(e.target.checked)}
+              />
+              <label htmlFor="ttl-check" className="flex-row gap-1 items-center" style={{cursor: 'pointer'}}>
+                <Clock size={16} /> Temporary Context (Expires in 24 hours)
+              </label>
+            </div>
+
+            <button type="submit" className="glass-button primary mt-4" disabled={uploading}>
               <Plus size={20} />
-              Add Memory
+              {uploading ? "Saving..." : "Add Memory"}
             </button>
           </form>
         </div>
@@ -134,7 +186,7 @@ export default function CaregiverDashboard() {
           {loading ? (
             <p>Loading memories...</p>
           ) : (
-            <div className="flex-col gap-4">
+            <div className="flex-col gap-4" style={{maxHeight: '600px', overflowY: 'auto'}}>
               {memories.map(memory => (
                 <div key={memory.id} className="glass-panel memory-list-item flex-row gap-4 items-center">
                   {memory.imageUrl ? (
@@ -147,7 +199,10 @@ export default function CaregiverDashboard() {
                     </div>
                   )}
                   <div className="memory-info">
-                    <h3>{memory.title}</h3>
+                    <h3>
+                      {memory.title} 
+                      {memory.expires_at && <span style={{fontSize: '0.7em', marginLeft: 8, color: '#e63946'}}>(Temporary)</span>}
+                    </h3>
                     <p>{memory.description.substring(0, 60)}...</p>
                   </div>
                 </div>
