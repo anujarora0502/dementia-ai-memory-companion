@@ -234,7 +234,7 @@ export default function ChatInterface() {
         let imageUrl: string | undefined;
         let imageTitle: string | undefined;
         
-        const imageMatch = replyContent.match(/\[SHOW_IMAGE:\s*([a-zA-Z0-9_-]+)\]/);
+        const imageMatch = replyContent.match(/\[SHOW_IMAGE:\s*([a-zA-Z0-9_-]+)\]/i);
         if (imageMatch) {
           const memoryId = imageMatch[1];
           replyContent = replyContent.replace(imageMatch[0], "").trim();
