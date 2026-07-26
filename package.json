@@ -9,12 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@supabase/supabase-js": "^2.109.0",
     "lucide-react": "^1.27.0",
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-mockframe": "^1.1.0",
     "sarvamai": "^1.1.7",
     "three": "^0.185.1"
   },

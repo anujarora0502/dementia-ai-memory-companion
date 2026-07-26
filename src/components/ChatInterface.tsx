@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Mic, MicOff, Settings, Square } from "lucide-react";
-import CalmParticles from "./CalmParticles";
+import AmbientGlow from "./AmbientGlow";
 import "./chat.css";
 
 interface Message {
@@ -13,12 +13,22 @@ interface Message {
 }
 
 export default function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "नमस्ते शीला, आप कैसे हैं? आज आपने क्या किया?" }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentSubtitle, setCurrentSubtitle] = useState("");
+  const [currentImage, setCurrentImage] = useState<{url: string, title: string} | null>(null);
   const [orbState, setOrbState] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
   const [liveTranscript, setLiveTranscript] = useState("");
   const [isConversationActive, setIsConversationActive] = useState(false);
+  const [profileLang, setProfileLang] = useState("hi-IN");
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then(r => r.json())
+      .then(data => {
+        if (data.language) setProfileLang(data.language);
+      })
+      .catch(err => console.error(err));
+  }, []);
   
   const recognitionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -40,7 +50,6 @@ export default function ChatInterface() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition && !recognitionRef.current) {
       const recognition = new SpeechRecognition();
-      recognition.lang = "hi-IN";
       recognition.continuous = false; // We manage the continuous loop manually for better control
       recognition.interimResults = true;
 
@@ -80,10 +89,10 @@ export default function ChatInterface() {
       };
 
       recognition.onerror = (e: any) => {
-        console.error("Speech recognition error", e.error);
         if (e.error === 'no-speech' && isConversationActiveRef.current) {
-          // Just ignore no-speech and let it restart via onend
+          // Just ignore no-speech and let it restart via onend silently
         } else {
+          console.error("Speech recognition error", e.error);
           setIsConversationActive(false);
           setOrbState("idle");
         }
@@ -100,6 +109,13 @@ export default function ChatInterface() {
       }
     };
   }, []); // Run once
+
+  // Update language when profileLang changes
+  useEffect(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = profileLang;
+    }
+  }, [profileLang]);
 
   const toggleConversation = () => {
     if (!isConversationActive) {
@@ -122,7 +138,7 @@ export default function ChatInterface() {
     }
   };
 
-  const playTTS = async (textToSpeak: string) => {
+  const playTTS = async (textToSpeak: string, imageUrl?: string, imageTitle?: string) => {
     try {
       const response = await fetch("/api/tts", {
         method: "POST",
@@ -149,6 +165,13 @@ export default function ChatInterface() {
         };
         
         setOrbState("speaking");
+        // Synchronize subtitle appearance with audio playback!
+        setCurrentSubtitle(textToSpeak);
+        if (imageUrl) {
+          setCurrentImage({ url: imageUrl, title: imageTitle || "" });
+        } else {
+          setCurrentImage(null);
+        }
         audio.play();
       } else {
         if (isConversationActiveRef.current) {
@@ -172,13 +195,18 @@ export default function ChatInterface() {
   const handleSendRef = useRef<((msg: string) => void) | null>(null);
   
   handleSendRef.current = async (userMessage: string) => {
-    setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+    const newMessage = { role: "user" as const, content: userMessage };
+    const chatHistory = [...messages, newMessage];
+    
+    setMessages(chatHistory);
+    setCurrentSubtitle(userMessage); // Show the user's message immediately while thinking
+    setCurrentImage(null);
     
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage })
+        body: JSON.stringify({ message: userMessage, history: chatHistory })
       });
       
       const data = await response.json();
@@ -199,6 +227,7 @@ export default function ChatInterface() {
               if (memoryData.imageUrl) {
                 imageUrl = memoryData.imageUrl;
                 imageTitle = memoryData.title;
+                setCurrentImage({ url: imageUrl, title: imageTitle });
               }
             }
           } catch (err) {}
@@ -211,9 +240,13 @@ export default function ChatInterface() {
           imageTitle
         }]);
 
-        // Speak the clean text
+        // Speak the clean text and synchronize subtitle appearance
         if (isConversationActiveRef.current) {
-          await playTTS(replyContent);
+          await playTTS(replyContent, imageUrl, imageTitle);
+        } else {
+          // If conversation is manually paused/stopped, just show it
+          setCurrentSubtitle(replyContent);
+          if (imageUrl) setCurrentImage({ url: imageUrl, title: imageTitle || "" });
         }
       } else {
         if (isConversationActiveRef.current) {
@@ -239,36 +272,29 @@ export default function ChatInterface() {
   return (
     <div className="chat-container" style={{ position: 'relative', overflow: 'hidden' }}>
       
-      {/* 3D Calm Particle Background */}
-      <CalmParticles isSpeaking={orbState === "speaking"} />
+      {/* Ambient Glow Background */}
+      <AmbientGlow state={orbState} />
 
       <header className="chat-header" style={{ position: 'relative', zIndex: 10 }}>
-        <a href="/caregiver" className="icon-btn" style={{color: 'var(--text-secondary)'}}>
-          <Settings size={24} />
-        </a>
+        {/* Placeholder to keep logo centered (matches width of the 24px placeholder on the right) */}
+        <div style={{width: 44}}></div>
         <div className="chat-intro-notice">
-          <p>Yaadein</p>
+          <img src="/logo.png" alt="Yaadein" className="header-logo" />
         </div>
-        <div style={{width: 24}}></div>
+        <div style={{width: 44}}></div>
       </header>
 
       <div className="voice-interface-main" style={{ position: 'relative', zIndex: 10 }}>
         <div className="transcript-area">
-          {latestMessage && latestMessage.role === "assistant" && (
-            <div className="message-bubble assistant animate-slide-up">
-              {latestMessage.content}
+          {currentSubtitle && (
+            <div className="cinematic-subtitle animate-slide-up" key={currentSubtitle}>
+              {currentSubtitle}
             </div>
           )}
           
-          {latestMessage && latestMessage.role === "assistant" && latestMessage.imageUrl && (
-            <div className="subtle-image-reveal">
-              <img src={latestMessage.imageUrl} alt={latestMessage.imageTitle || "Memory"} />
-            </div>
-          )}
-          
-          {latestMessage && latestMessage.role === "user" && (
-            <div className="message-bubble user animate-slide-up">
-              {latestMessage.content}
+          {currentImage && (
+            <div className="cinematic-image">
+              <img src={currentImage.url} alt={currentImage.title} />
             </div>
           )}
         </div>
@@ -276,12 +302,12 @@ export default function ChatInterface() {
         {/* Minimal Control Bar */}
         <div className="subtle-controls flex-col items-center gap-2 mt-8">
           {liveTranscript && (
-            <div className="live-transcript" style={{ marginBottom: '1rem', background: 'rgba(255,255,255,0.2)' }}>
+            <div className="live-transcript" style={{ marginBottom: '1rem' }}>
               {liveTranscript}
             </div>
           )}
           
-          <div className="orb-status-text" style={{ marginBottom: '0.5rem', opacity: 0.8 }}>
+          <div className="orb-status-text" style={{ marginBottom: '0.5rem' }}>
             {orbState === "idle" && "Tap to start conversation"}
             {orbState === "listening" && "Listening..."}
             {orbState === "thinking" && "Thinking..."}
@@ -292,14 +318,24 @@ export default function ChatInterface() {
             onClick={toggleConversation}
             className="glass-button"
             style={{
-              padding: '1rem',
-              borderRadius: '50%',
-              background: isConversationActive ? 'rgba(230, 57, 70, 0.2)' : 'rgba(255,255,255,0.3)',
-              border: `1px solid ${isConversationActive ? 'rgba(230, 57, 70, 0.5)' : 'rgba(255,255,255,0.5)'}`,
-              color: isConversationActive ? '#E63946' : 'var(--text-primary)'
+              padding: isConversationActive ? '0' : '1rem',
+              background: 'transparent',
+              border: 'none',
+              color: '#1a1a1a',
+              outline: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '80px',
+              height: '80px'
             }}
           >
-            {isConversationActive ? <Square size={24} fill="currentColor" /> : <Mic size={24} />}
+            {isConversationActive ? (
+              <div className="mic-active-ring" />
+            ) : (
+              <Mic size={32} />
+            )}
           </button>
         </div>
       </div>

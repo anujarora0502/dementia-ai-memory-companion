@@ -4,76 +4,104 @@ import { memoryStore } from '@/lib/memoryStore';
 const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
 // The default model for Sarvam API chat completions (e.g., sarvam-2b-v0.5 or something they provide). We'll use "sarvam-2b-v0.5" or similar standard. 
 // Since we don't have the exact model name, let's use a placeholder that can be configured.
-const SARVAM_MODEL = process.env.SARVAM_MODEL || "sarvam-2b-v0.5";
+const SARVAM_MODEL = process.env.SARVAM_MODEL || "sarvam-30b";
 
 export async function POST(request: Request) {
   try {
-    const { message } = await request.json();
+    const { message, history } = await request.json();
     
-    if (!message) {
+    if (!message && (!history || history.length === 0)) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
     const profile = await memoryStore.getProfile();
     const memories = await memoryStore.getMemories();
 
-    // Construct the context string
-    const memoriesContext = memories.map(m => 
-      `Memory ID: ${m.id}\nTitle: ${m.title}\nDetails: ${m.description}\nHas Photo: ${m.imageUrl ? 'Yes' : 'No'}`
-    ).join("\n\n");
+    const memoriesContext = memories.map(m => {
+      const isTemporary = m.expires_at ? `\nURGENT: This is a temporary context expiring on ${new Date(m.expires_at).toLocaleString()}. Prioritize bringing this up!` : "";
+      return `Memory ID: ${m.id}\nTitle: ${m.title}\nDetails: ${m.description}\nHas Photo: ${m.imageUrl ? 'Yes' : 'No'}${isTemporary}`;
+    }).join("\n\n");
 
-    const systemPrompt = `You are Yaadein, a patient, empathetic, and multilingual AI voice companion for ${profile.name}.
-Your primary goal is to help preserve personal memories, gently help retrieve them, and adapt to keep those memories alive in a respectful manner.
-${profile.name}'s Profile Context: ${profile.relationContext}
-Hobbies: ${profile.hobbies.join(", ")}
+    // Convert BCP-47 tag to language name for the prompt
+    const languageNames: Record<string, string> = {
+      "hi-IN": "HINDI (using Devanagari script)",
+      "en-US": "ENGLISH",
+      "gu-IN": "GUJARATI (using Gujarati script)",
+      "mr-IN": "MARATHI (using Devanagari script)",
+      "ta-IN": "TAMIL (using Tamil script)",
+      "bn-IN": "BENGALI (using Bengali script)"
+    };
+    const targetLanguage = languageNames[profile.language || "hi-IN"] || "HINDI (using Devanagari script)";
 
-Here are some important memories from ${profile.name}'s life (Memory Graph):
+    const systemPrompt = `You are Yaadein, a warm voice companion for ${profile.name}. Speak ONLY in ${targetLanguage}.
+Memories:
 ${memoriesContext}
 
-CORE PRINCIPLES:
-1. REMEMBER: Use the provided memory graph. You learn how they remember.
-2. RETRIEVE: Help them recall memories using gentle, personalized cues instead of direct answers.
-3. REINFORCE: Revisit important memories naturally over time in your daily 10-minute conversations.
-4. RESPECT: Never test, correct, or embarrass ${profile.name}. Preserve dignity and connection. Speak in a calm, reassuring manner.
-
-INSTRUCTIONS:
-1. YOU MUST SPEAK IN HINDI (using Devanagari script). 
-2. Speak warmly and gently, like a caring companion. Keep responses conversational and easy to follow.
-3. CRITICAL LIMIT: You MUST keep your responses EXTREMELY short. Maximum 1 or 2 short sentences. This is a voice chat, so long responses take too long to generate.
-4. YOU MUST LEAD THE CONVERSATION. End your responses with a gentle, open-ended question in Hindi that guides the user to share a memory or talk about their day. Do not passively wait for them.
-5. Do not interrogate. Gently provide cues and prompt them to share stories.
-6. CRITICAL: If you gently guide them to a memory that "Has Photo: Yes", you MUST include the exact tag [SHOW_IMAGE: Memory ID] at the very end of your response to subtly surface a visual cue. For example: "मुझे याद है आपने उस दिन के बारे में बताया था। [SHOW_IMAGE: 1]"
-7. Do not hallucinate memory IDs. Only use the ones provided above.`;
+RULES:
+- MAX 2 short sentences. This is voice chat.
+- Be warm. End with a gentle question to guide them to share a memory.
+- Never test or correct them.
+- PROACTIVE RECALL: If there is a memory (especially an URGENT temporary one) that hasn't been discussed yet in this conversation, gently bring it up or ask a question about it.
+- If a memory has a photo, append [SHOW_IMAGE: Memory ID] at the end.
+- Only use memory IDs listed above.`;
 
     // If we have a Sarvam API key, call their endpoint
     if (SARVAM_API_KEY) {
-      const response = await fetch("https://api.sarvam.ai/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SARVAM_API_KEY}`, // Usually it's api-subscription-key but let's try standard Bearer or we can check docs. Wait, the docs said:
-          // "Keys are typically passed via the api-subscription-key header in your requests." Let's include both to be safe.
-          // Actually, let's use "api-subscription-key" as specified in docs.
-          "api-subscription-key": SARVAM_API_KEY
-        },
-        body: JSON.stringify({
-          model: SARVAM_MODEL,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: message }
-          ],
-          temperature: 0.7,
-          max_tokens: 250
-        })
-      });
+      try {
+        const response = await fetch("https://api.sarvam.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "api-subscription-key": SARVAM_API_KEY
+          },
+          body: JSON.stringify({
+            model: "sarvam-30b", // Hardcoded smaller model as requested
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...(history && history.length > 0 
+                ? history.map((h: any) => ({ role: h.role, content: h.content })) 
+                : [{ role: "user", content: message }])
+            ],
+            temperature: 0.5,
+            max_tokens: 4000,
+            reasoning_effort: null
+          })
+        });
 
       if (response.ok) {
         const data = await response.json();
-        const reply = data.choices[0]?.message?.content || "I'm here for you.";
+        let reply = data.choices?.[0]?.message?.content || "";
+
+        // sarvam-30b is a reasoning model — strip internal <think>...</think> tags
+        reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+        // If the model only produced thinking and no actual reply, or reply is empty
+        if (!reply || reply.length < 3) {
+          console.warn("Sarvam returned empty after stripping thinking. Raw:", data.choices?.[0]?.message?.content?.substring(0, 200));
+          // Generate a warm fallback in the target language
+          const fallbacks: Record<string, string> = {
+            "HINDI (using Devanagari script)": `${profile.name}, आज आपका दिन कैसा रहा? कुछ बताइए ना।`,
+            "ENGLISH": `${profile.name}, how has your day been? Tell me something nice.`,
+            "GUJARATI (using Gujarati script)": `${profile.name}, આજે તમારો દિવસ કેવો રહ્યો? કંઈક કહો ને.`,
+            "MARATHI (using Devanagari script)": `${profile.name}, आज तुमचा दिवस कसा गेला? काहीतरी सांगा ना.`,
+            "TAMIL (using Tamil script)": `${profile.name}, இன்று உங்கள் நாள் எப்படி இருந்தது? ஏதாவது சொல்லுங்கள்.`,
+            "BENGALI (using Bengali script)": `${profile.name}, আজ আপনার দিন কেমন কাটলো? কিছু বলুন না.`
+          };
+          reply = fallbacks[targetLanguage] || fallbacks["HINDI (using Devanagari script)"];
+        }
+
         return NextResponse.json({ reply });
       } else {
-        console.error("Sarvam API error:", await response.text());
+        const errText = await response.text();
+        console.error("Sarvam API error:", errText);
         // Fallback to mock on error
+      }
+      } catch (e: any) {
+        if (e.name === 'AbortError') {
+          console.warn("Sarvam API timed out after 3.5s, falling back to mock");
+        } else {
+          console.error("Sarvam fetch failed:", e);
+        }
       }
     }
 

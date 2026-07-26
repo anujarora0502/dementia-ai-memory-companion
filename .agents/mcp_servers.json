@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sarvam": {
+      "command": "uvx",
+      "args": ["sarvam-mcp"],
+      "env": {
+        "SARVAM_API_KEY": "sk_ek1ea85d_vuAszkYAwNnPiEYJo9WbCLhm"
+      }
+    }
+  }
+}

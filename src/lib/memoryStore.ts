@@ -13,14 +13,16 @@ export interface UserProfile {
   name: string;
   relationContext: string;
   hobbies: string[];
+  language: string;
 }
 
 // Keeping the profile simple and in-memory for the hackathon MVP,
 // as the main request was to move the core memories to Supabase.
-const defaultProfile: UserProfile = {
-  name: "Sheela",
-  relationContext: "Daughter is Sarah. Grandson is Leo. Used to be a school teacher.",
-  hobbies: ["Gardening", "Reading historical fiction", "Baking cookies"]
+let defaultProfile: UserProfile = {
+  name: "Dost",
+  relationContext: "",
+  hobbies: [],
+  language: "hi-IN"
 };
 
 export const memoryStore = {
@@ -98,6 +100,11 @@ export const memoryStore = {
   },
 
   async getProfile(): Promise<UserProfile> {
+    return defaultProfile;
+  },
+
+  async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
+    defaultProfile = { ...defaultProfile, ...updates };
     return defaultProfile;
   }
 };

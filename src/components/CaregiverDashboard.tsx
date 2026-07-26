@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { ArrowLeft, Plus, Image as ImageIcon, Upload, Clock } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import React, { useState, useEffect, useRef } from "react";
+import { ArrowLeft, Plus, Image as ImageIcon, Upload, Clock, Globe, Sparkles } from "lucide-react";
 import "./dashboard.css";
 
 interface Memory {
@@ -23,6 +22,18 @@ export default function CaregiverDashboard() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isTemporary, setIsTemporary] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [language, setLanguage] = useState("hi-IN");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch("/api/profile");
+      const data = await res.json();
+      if (data.language) setLanguage(data.language);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchMemories = async () => {
     try {
@@ -38,7 +49,21 @@ export default function CaregiverDashboard() {
 
   useEffect(() => {
     fetchMemories();
+    fetchProfile();
   }, []);
+
+  const handleLanguageChange = async (newLang: string) => {
+    setLanguage(newLang);
+    try {
+      await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: newLang })
+      });
+    } catch (err) {
+      console.error("Failed to update language:", err);
+    }
+  };
 
   const handleAddMemory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,25 +73,26 @@ export default function CaregiverDashboard() {
     try {
       let finalImageUrl = "";
 
-      // Handle Image Upload to Supabase Storage
+      // Handle Image Upload via server-side API
       if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `caregiver-uploads/${fileName}`;
+        const uploadForm = new FormData();
+        uploadForm.append('file', selectedFile);
 
-        const { error: uploadError } = await supabase.storage
-          .from('photos')
-          .upload(filePath, selectedFile);
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: uploadForm
+        });
 
-        if (uploadError) {
-          console.error("Upload failed", uploadError);
-          alert("Failed to upload image.");
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json();
+          console.error("Upload failed", errData);
+          alert("Failed to upload image: " + (errData.error || "Unknown error"));
           setUploading(false);
           return;
         }
 
-        const { data } = supabase.storage.from('photos').getPublicUrl(filePath);
-        finalImageUrl = data.publicUrl;
+        const uploadData = await uploadRes.json();
+        finalImageUrl = uploadData.url;
       }
 
       // Calculate TTL (Expires tomorrow if temporary)
@@ -105,10 +131,16 @@ export default function CaregiverDashboard() {
 
   return (
     <div className="dashboard-container">
-      <header className="dashboard-header glass-panel">
-        <div className="flex-row items-center gap-4">
-          <a href="/" className="glass-button icon-btn">
-            <ArrowLeft size={24} />
+      {/* ── Header ── */}
+      <header className="dashboard-header dash-animate">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <a href="/" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 36, height: 36, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.08)',
+            color: '#1a1a1a', textDecoration: 'none', transition: 'all 0.3s ease'
+          }}>
+            <ArrowLeft size={18} />
           </a>
           <div>
             <h1>Caregiver Dashboard</h1>
@@ -117,98 +149,129 @@ export default function CaregiverDashboard() {
         </div>
       </header>
 
-      <div className="dashboard-content mt-8 flex-row gap-8">
-        
-        {/* Add Memory Form */}
-        <div className="form-section flex-1 animate-slide-up">
-          <form className="glass-panel flex-col gap-4" onSubmit={handleAddMemory}>
-            <h2>Add New Memory</h2>
-            
-            <div className="flex-col gap-2">
-              <label>Memory Title</label>
-              <input 
-                type="text" 
-                className="glass-input" 
-                placeholder="e.g., Summer at the Lakehouse"
-                value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
-                required
-              />
-            </div>
+      <div className="dashboard-content">
 
-            <div className="flex-col gap-2">
-              <label>Description & Context</label>
-              <textarea 
-                className="glass-input" 
-                rows={4}
-                placeholder="Provide details about the memory for the AI to understand..."
-                value={newDescription}
-                onChange={e => setNewDescription(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="flex-col gap-2">
-              <label>Upload Photograph</label>
-              <div className="flex-row gap-2 items-center">
-                <Upload size={20} className="text-secondary" />
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  className="glass-input w-full" 
-                  onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+        {/* ── Add Memory Form ── */}
+        <div className="dash-animate d1">
+          <div className="section-title">
+            <span className="accent-dot"></span>
+            Add New Memory
+          </div>
+          <form className="form-card" onSubmit={handleAddMemory}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              <div>
+                <label>Memory Title</label>
+                <input
+                  type="text"
+                  className="dash-input"
+                  placeholder="e.g., Summer at the Lakehouse"
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  required
                 />
               </div>
-            </div>
 
-            <div className="flex-row gap-2 items-center mt-2">
-              <input 
-                type="checkbox" 
-                id="ttl-check"
-                checked={isTemporary}
-                onChange={e => setIsTemporary(e.target.checked)}
-              />
-              <label htmlFor="ttl-check" className="flex-row gap-1 items-center" style={{cursor: 'pointer'}}>
-                <Clock size={16} /> Temporary Context (Expires in 24 hours)
-              </label>
-            </div>
+              <div>
+                <label>Description & Context</label>
+                <textarea
+                  className="dash-input"
+                  rows={3}
+                  placeholder="Provide details about the memory for the AI to understand..."
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                  required
+                />
+              </div>
 
-            <button type="submit" className="glass-button primary mt-4" disabled={uploading}>
-              <Plus size={20} />
-              {uploading ? "Saving..." : "Add Memory"}
-            </button>
+              <div>
+                <label>Photograph</label>
+                <div className="upload-zone" onClick={() => fileInputRef.current?.click()}>
+                  <div className="upload-icon-circle">
+                    <Upload size={16} />
+                  </div>
+                  <span className="upload-label">
+                    {selectedFile ? selectedFile.name : "Tap to upload a photo"}
+                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              </div>
+
+
+              <button type="submit" className="submit-btn" disabled={uploading}>
+                <Plus size={18} />
+                {uploading ? "Saving..." : "Add Memory"}
+              </button>
+            </div>
           </form>
         </div>
 
-        {/* Memories List */}
-        <div className="memories-list flex-1 flex-col gap-4 animate-slide-up stagger-1">
-          <h2>Existing Memories</h2>
+        {/* ── Existing Memories ── */}
+        <div className="dash-animate d2">
+          <div className="section-title">
+            <span className="accent-dot"></span>
+            Memories ({memories.length})
+          </div>
+
           {loading ? (
-            <p>Loading memories...</p>
+            <div className="empty-state">Loading memories...</div>
+          ) : memories.length === 0 ? (
+            <div className="empty-state">
+              <Sparkles size={24} style={{ marginBottom: '0.5rem', opacity: 0.3 }} />
+              <p>No memories yet. Add one above!</p>
+            </div>
           ) : (
-            <div className="flex-col gap-4 memories-list-scroll">
+            <div className="memories-scroll">
               {memories.map(memory => (
-                <div key={memory.id} className="glass-panel memory-list-item flex-row gap-4 items-center">
+                <div key={memory.id} className="memory-card">
                   {memory.imageUrl ? (
-                    <div className="thumbnail">
-                      <img src={memory.imageUrl} alt={memory.title} />
-                    </div>
+                    <img src={memory.imageUrl} alt={memory.title} className="memory-image-thumb" />
                   ) : (
-                    <div className="thumbnail placeholder">
-                      <ImageIcon size={24} />
+                    <div className="memory-icon-thumb">
+                      <ImageIcon size={20} />
                     </div>
                   )}
                   <div className="memory-info">
                     <h3>
-                      {memory.title} 
-                      {memory.expires_at && <span style={{fontSize: '0.7em', marginLeft: 8, color: '#e63946'}}>(Temporary)</span>}
+                      {memory.title}
+                      {memory.expires_at && <span className="temp-badge">Temp</span>}
                     </h3>
-                    <p>{memory.description.substring(0, 60)}...</p>
+                    <p>{memory.description.substring(0, 55)}...</p>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+
+        {/* ── Preferences ── */}
+        <div className="dash-animate d3">
+          <div className="section-title">
+            <span className="accent-dot"></span>
+            AI Preferences
+          </div>
+          <div className="pref-card">
+            <div>
+              <label><Globe size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Companion Language</label>
+              <select
+                className="lang-select"
+                value={language}
+                onChange={e => handleLanguageChange(e.target.value)}
+              >
+                <option value="hi-IN">🇮🇳 Hindi</option>
+                <option value="en-US">🇺🇸 English</option>
+                <option value="gu-IN">🇮🇳 Gujarati</option>
+                <option value="mr-IN">🇮🇳 Marathi</option>
+                <option value="ta-IN">🇮🇳 Tamil</option>
+                <option value="bn-IN">🇮🇳 Bengali</option>
+              </select>
+              <p className="pref-hint">The AI will instantly switch its spoken and understood language.</p>
+            </div>
+          </div>
         </div>
 
       </div>

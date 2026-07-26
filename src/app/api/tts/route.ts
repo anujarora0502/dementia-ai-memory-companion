@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { memoryStore } from '@/lib/memoryStore';
 
 const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
 
@@ -11,10 +12,11 @@ export async function POST(request: Request) {
     }
 
     if (!SARVAM_API_KEY) {
-       // Mock response for development if no key is provided
-       // In a real hackathon, we need the key. For now, return an empty audio or error
        return NextResponse.json({ error: "API key missing, cannot generate voice" }, { status: 401 });
     }
+
+    const profile = await memoryStore.getProfile();
+    const targetLanguageCode = profile.language || "hi-IN";
 
     const response = await fetch("https://api.sarvam.ai/text-to-speech", {
       method: "POST",
@@ -24,9 +26,9 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         inputs: [text],
-        target_language_code: "hi-IN",
-        speaker: "kavya",
-        pace: 0.9,
+        target_language_code: targetLanguageCode,
+        speaker: "anand",
+        pace: 0.85,
         speech_sample_rate: 8000,
         enable_preprocessing: true,
         model: "bulbul:v3"

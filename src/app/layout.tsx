@@ -7,6 +7,9 @@ const outfit = Outfit({
   variable: "--font-outfit",
 });
 
+import DeviceWrapper from "@/components/DeviceWrapper";
+import GlobalControls from "@/components/GlobalControls";
+
 export const metadata: Metadata = {
   title: "AI Memory Companion",
   description: "A patient, empathetic conversational partner designed to help preserve personal memories.",
@@ -19,7 +22,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={outfit.className}>{children}</body>
+      <body className={outfit.className} style={{ margin: 0, padding: 0, backgroundColor: '#ffffff', overflow: 'hidden' }}>
+        <DeviceWrapper>
+          {children}
+        </DeviceWrapper>
+        <GlobalControls />
+      </body>
     </html>
   );
 }

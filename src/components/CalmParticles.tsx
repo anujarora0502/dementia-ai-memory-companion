@@ -62,7 +62,6 @@ export default function CalmParticles({ isSpeaking = false }: { isSpeaking?: boo
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
       <Canvas camera={{ position: [0, 0, 5], fov: 60 }}>
-        <color attach="background" args={["transparent"]} />
         <ambientLight intensity={0.5} />
         <ParticleField isSpeaking={isSpeaking} />
       </Canvas>
