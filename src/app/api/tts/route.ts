@@ -25,13 +25,11 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         inputs: [text],
         target_language_code: "hi-IN",
-        speaker: "meera",
-        pitch: 0,
-        pace: 1.05,
-        loudness: 1.5,
+        speaker: "kavya",
+        pace: 0.9,
         speech_sample_rate: 8000,
         enable_preprocessing: true,
-        model: "bulbul:v1" // standard sarvam tts model
+        model: "bulbul:v3"
       })
     });
 
