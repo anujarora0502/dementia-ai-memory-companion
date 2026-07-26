@@ -186,7 +186,7 @@ export default function CaregiverDashboard() {
           {loading ? (
             <p>Loading memories...</p>
           ) : (
-            <div className="flex-col gap-4" style={{maxHeight: '600px', overflowY: 'auto'}}>
+            <div className="flex-col gap-4 memories-list-scroll">
               {memories.map(memory => (
                 <div key={memory.id} className="glass-panel memory-list-item flex-row gap-4 items-center">
                   {memory.imageUrl ? (
