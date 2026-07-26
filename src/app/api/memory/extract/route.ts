@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { memoryStore } from '@/lib/memoryStore';
 
+export const maxDuration = 60; // Allow up to 60 seconds on Vercel for the LLM to extract memories
 const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
 
 export async function POST(request: Request) {
